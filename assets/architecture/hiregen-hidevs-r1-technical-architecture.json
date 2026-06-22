@@ -1,0 +1,590 @@
+{
+  "version": "1.0",
+  "diagramId": "exported",
+  "title": "Architecture Diagram",
+  "nodes": [
+    {
+      "id": "recruiter-client",
+      "type": "frontend",
+      "label": "Recruiter Dashboard",
+      "generic_name": "recruiter dashboard",
+      "ports": [
+        {
+          "id": "out-api",
+          "label": "API Requests",
+          "side": "right"
+        }
+      ],
+      "data": {
+        "description": "Next.js recruiter dashboard for JD upload, candidate review, and decision making.",
+        "tech": [
+          "nextjs",
+          "typescript",
+          "tailwind-css",
+          "shadcn-ui"
+        ],
+        "cloud": "vercel",
+        "isolated": false
+      }
+    },
+    {
+      "id": "nextjs-api-gateway",
+      "type": "api-gateway",
+      "label": "Next.js API Gateway",
+      "generic_name": "api gateway",
+      "ports": [
+        {
+          "id": "in-client",
+          "label": "Client In",
+          "side": "left"
+        },
+        {
+          "id": "out-mastra",
+          "label": "Mastra Workflow",
+          "side": "right"
+        }
+      ],
+      "data": {
+        "description": "Next.js API routes acting as the gateway to the Mastra workflow service.",
+        "tech": [
+          "nextjs-api-routes",
+          "typescript",
+          "clerk-auth"
+        ],
+        "cloud": "vercel",
+        "isolated": false
+      }
+    },
+    {
+      "id": "mastra-workflow-service",
+      "type": "service",
+      "label": "Mastra Workflow Service",
+      "generic_name": "workflow orchestrator",
+      "ports": [
+        {
+          "id": "in-api",
+          "label": "API In",
+          "side": "left"
+        },
+        {
+          "id": "out-agents",
+          "label": "Agent Dispatch",
+          "side": "right"
+        },
+        {
+          "id": "out-db",
+          "label": "Data Access",
+          "side": "bottom"
+        },
+        {
+          "id": "out-safety",
+          "label": "Safety Gate",
+          "side": "top"
+        }
+      ],
+      "data": {
+        "description": "Core orchestration service using Mastra to manage agent workflows, state, and human-in-the-loop actions.",
+        "tech": [
+          "mastra",
+          "typescript",
+          "node-js"
+        ],
+        "cloud": "vercel-functions",
+        "isolated": false
+      }
+    },
+    {
+      "id": "jd-analyzer-agent",
+      "type": "service",
+      "label": "JD Analyzer Agent",
+      "generic_name": "jd analyzer agent",
+      "ports": [
+        {
+          "id": "in-mastra",
+          "label": "Task In",
+          "side": "left"
+        }
+      ],
+      "data": {
+        "description": "Extracts role requirements, skills, and risk factors from JDs.",
+        "tech": [
+          "mastra-agent",
+          "typescript",
+          "openai-gpt-4o"
+        ],
+        "isolated": true
+      }
+    },
+    {
+      "id": "skill-graph-agent",
+      "type": "service",
+      "label": "Skill Graph Agent",
+      "generic_name": "skill graph agent",
+      "ports": [
+        {
+          "id": "in-mastra",
+          "label": "Task In",
+          "side": "left"
+        },
+        {
+          "id": "out-github",
+          "label": "GitHub API",
+          "side": "right"
+        }
+      ],
+      "data": {
+        "description": "Converts candidate evidence (GitHub, resumes) into structured skill graphs.",
+        "tech": [
+          "mastra-agent",
+          "typescript",
+          "github-api",
+          "playwright"
+        ],
+        "isolated": false
+      }
+    },
+    {
+      "id": "candidate-ranker-agent",
+      "type": "service",
+      "label": "Candidate Ranker Agent",
+      "generic_name": "candidate ranker agent",
+      "ports": [
+        {
+          "id": "in-mastra",
+          "label": "Task In",
+          "side": "left"
+        }
+      ],
+      "data": {
+        "description": "Ranks candidates semantically against JD using evidence levels.",
+        "tech": [
+          "mastra-agent",
+          "typescript",
+          "qdrant-client"
+        ],
+        "isolated": true
+      }
+    },
+    {
+      "id": "interview-gen-agent",
+      "type": "service",
+      "label": "Interview Generator Agent",
+      "generic_name": "interview generator agent",
+      "ports": [
+        {
+          "id": "in-mastra",
+          "label": "Task In",
+          "side": "left"
+        }
+      ],
+      "data": {
+        "description": "Creates role-specific interview questions and validation tasks.",
+        "tech": [
+          "mastra-agent",
+          "typescript"
+        ],
+        "isolated": true
+      }
+    },
+    {
+      "id": "response-eval-agent",
+      "type": "service",
+      "label": "Response Evaluation Agent",
+      "generic_name": "response evaluation agent",
+      "ports": [
+        {
+          "id": "in-mastra",
+          "label": "Task In",
+          "side": "left"
+        }
+      ],
+      "data": {
+        "description": "Evaluates candidate responses against rubrics and expected signals.",
+        "tech": [
+          "mastra-agent",
+          "typescript"
+        ],
+        "isolated": true
+      }
+    },
+    {
+      "id": "recruiter-copilot-agent",
+      "type": "service",
+      "label": "Recruiter Copilot Agent",
+      "generic_name": "recruiter copilot agent",
+      "ports": [
+        {
+          "id": "in-mastra",
+          "label": "Task In",
+          "side": "left"
+        }
+      ],
+      "data": {
+        "description": "Summarizes candidates into recruiter-ready recommendations.",
+        "tech": [
+          "mastra-agent",
+          "typescript"
+        ],
+        "isolated": true
+      }
+    },
+    {
+      "id": "qdrant-cloud-db",
+      "type": "database",
+      "label": "Qdrant Cloud (Vector DB)",
+      "generic_name": "vector database",
+      "ports": [
+        {
+          "id": "in-mastra",
+          "label": "Query/Upsert",
+          "side": "top"
+        }
+      ],
+      "data": {
+        "description": "Vector database for role intelligence, candidate embeddings, evidence chunks, and outcome memory.",
+        "tech": [
+          "qdrant"
+        ],
+        "cloud": "qdrant-cloud",
+        "isolated": false
+      }
+    },
+    {
+      "id": "neon-postgres-db",
+      "type": "database",
+      "label": "Neon PostgreSQL (Metadata)",
+      "generic_name": "relational database",
+      "ports": [
+        {
+          "id": "in-mastra",
+          "label": "SQL Access",
+          "side": "top"
+        }
+      ],
+      "data": {
+        "description": "Structured storage for run state, recruiter decisions, audit logs, and metadata.",
+        "tech": [
+          "neon-postgres",
+          "postgresql",
+          "prisma"
+        ],
+        "cloud": "neon-cloud",
+        "isolated": false
+      }
+    },
+    {
+      "id": "cloudflare-r2-storage",
+      "type": "database",
+      "label": "Cloudflare R2 (Artifacts)",
+      "generic_name": "object storage",
+      "ports": [
+        {
+          "id": "in-mastra",
+          "label": "File Access",
+          "side": "top"
+        }
+      ],
+      "data": {
+        "description": "Object storage for uploaded resumes, evidence files, and project artifacts.",
+        "tech": [
+          "cloudflare-r2",
+          "s3-compatible-api"
+        ],
+        "cloud": "cloudflare-r2",
+        "isolated": false
+      }
+    },
+    {
+      "id": "enkrypt-ai-safety-gate",
+      "type": "service",
+      "label": "Enkrypt AI Safety Gate",
+      "generic_name": "safety gate api",
+      "ports": [
+        {
+          "id": "in-mastra",
+          "label": "Safety Check",
+          "side": "bottom"
+        }
+      ],
+      "data": {
+        "description": "Safety and fairness layer for grounding checks, bias detection, and PII compliance.",
+        "tech": [
+          "enkrypt-ai-api"
+        ],
+        "isolated": true
+      }
+    },
+    {
+      "id": "github-external-api",
+      "type": "service",
+      "label": "GitHub API",
+      "generic_name": "github api",
+      "ports": [
+        {
+          "id": "in-agent",
+          "label": "API In",
+          "side": "left"
+        }
+      ],
+      "data": {
+        "description": "External API for fetching public portfolio evidence and project proof.",
+        "tech": [
+          "github-rest-api"
+        ],
+        "isolated": true
+      }
+    },
+    {
+      "id": "llm-provider-api",
+      "type": "service",
+      "label": "LLM Provider (via Mastra)",
+      "generic_name": "llm provider",
+      "ports": [
+        {
+          "id": "in-mastra-agents",
+          "label": "Inference In",
+          "side": "left"
+        }
+      ],
+      "data": {
+        "description": "LLM provider for agent reasoning and generation.",
+        "tech": [
+          "openai-gpt-4o-mini-or-o1-preview"
+        ],
+        "isolated": true
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "client-to-gateway",
+      "source": {
+        "nodeId": "recruiter-client",
+        "portId": "out-api"
+      },
+      "target": {
+        "nodeId": "nextjs-api-gateway",
+        "portId": "in-client"
+      },
+      "type": "http",
+      "label": "HTTP/JSON"
+    },
+    {
+      "id": "gateway-to-mastra",
+      "source": {
+        "nodeId": "nextjs-api-gateway",
+        "portId": "out-mastra"
+      },
+      "target": {
+        "nodeId": "mastra-workflow-service",
+        "portId": "in-api"
+      },
+      "type": "internal-api",
+      "label": "Workflow Trigger"
+    },
+    {
+      "id": "mastra-to-jd-agent",
+      "source": {
+        "nodeId": "mastra-workflow-service",
+        "portId": "out-agents"
+      },
+      "target": {
+        "nodeId": "jd-analyzer-agent",
+        "portId": "in-mastra"
+      },
+      "type": "internal-api",
+      "label": "Analyze JD"
+    },
+    {
+      "id": "mastra-to-skill-agent",
+      "source": {
+        "nodeId": "mastra-workflow-service",
+        "portId": "out-agents"
+      },
+      "target": {
+        "nodeId": "skill-graph-agent",
+        "portId": "in-mastra"
+      },
+      "type": "internal-api",
+      "label": "Build Skill Graph"
+    },
+    {
+      "id": "mastra-to-ranker-agent",
+      "source": {
+        "nodeId": "mastra-workflow-service",
+        "portId": "out-agents"
+      },
+      "target": {
+        "nodeId": "candidate-ranker-agent",
+        "portId": "in-mastra"
+      },
+      "type": "internal-api",
+      "label": "Rank Candidates"
+    },
+    {
+      "id": "mastra-to-interview-agent",
+      "source": {
+        "nodeId": "mastra-workflow-service",
+        "portId": "out-agents"
+      },
+      "target": {
+        "nodeId": "interview-gen-agent",
+        "portId": "in-mastra"
+      },
+      "type": "internal-api",
+      "label": "Generate Interview"
+    },
+    {
+      "id": "mastra-to-eval-agent",
+      "source": {
+        "nodeId": "mastra-workflow-service",
+        "portId": "out-agents"
+      },
+      "target": {
+        "nodeId": "response-eval-agent",
+        "portId": "in-mastra"
+      },
+      "type": "internal-api",
+      "label": "Evaluate Responses"
+    },
+    {
+      "id": "mastra-to-copilot-agent",
+      "source": {
+        "nodeId": "mastra-workflow-service",
+        "portId": "out-agents"
+      },
+      "target": {
+        "nodeId": "recruiter-copilot-agent",
+        "portId": "in-mastra"
+      },
+      "type": "internal-api",
+      "label": "Summarize Recs"
+    },
+    {
+      "id": "mastra-to-qdrant",
+      "source": {
+        "nodeId": "mastra-workflow-service",
+        "portId": "out-db"
+      },
+      "target": {
+        "nodeId": "qdrant-cloud-db",
+        "portId": "in-mastra"
+      },
+      "type": "database",
+      "label": "Vector Memory"
+    },
+    {
+      "id": "mastra-to-neon",
+      "source": {
+        "nodeId": "mastra-workflow-service",
+        "portId": "out-db"
+      },
+      "target": {
+        "nodeId": "neon-postgres-db",
+        "portId": "in-mastra"
+      },
+      "type": "database",
+      "label": "Structured State"
+    },
+    {
+      "id": "mastra-to-r2",
+      "source": {
+        "nodeId": "mastra-workflow-service",
+        "portId": "out-db"
+      },
+      "target": {
+        "nodeId": "cloudflare-r2-storage",
+        "portId": "in-mastra"
+      },
+      "type": "database",
+      "label": "Artifact Storage"
+    },
+    {
+      "id": "mastra-to-enkrypt",
+      "source": {
+        "nodeId": "mastra-workflow-service",
+        "portId": "out-safety"
+      },
+      "target": {
+        "nodeId": "enkrypt-ai-safety-gate",
+        "portId": "in-mastra"
+      },
+      "type": "internal-api",
+      "label": "Safety Gate"
+    },
+    {
+      "id": "skill-agent-to-github",
+      "source": {
+        "nodeId": "skill-graph-agent",
+        "portId": "out-github"
+      },
+      "target": {
+        "nodeId": "github-external-api",
+        "portId": "in-agent"
+      },
+      "type": "http",
+      "label": "Fetch Evidence"
+    },
+    {
+      "id": "mastra-to-llm",
+      "source": {
+        "nodeId": "mastra-workflow-service",
+        "portId": "out-agents"
+      },
+      "target": {
+        "nodeId": "llm-provider-api",
+        "portId": "in-mastra-agents"
+      },
+      "type": "http",
+      "label": "Inference"
+    }
+  ],
+  "groups": [
+    {
+      "children": [
+        "recruiter-client"
+      ],
+      "id": "frontend-group",
+      "label": "Frontend Layer (Vercel)"
+    },
+    {
+      "children": [
+        "nextjs-api-gateway",
+        "mastra-workflow-service"
+      ],
+      "id": "backend-orchestration-group",
+      "label": "Backend & Orchestration (Next.js + Mastra)"
+    },
+    {
+      "children": [
+        "jd-analyzer-agent",
+        "skill-graph-agent",
+        "candidate-ranker-agent",
+        "interview-gen-agent",
+        "response-eval-agent",
+        "recruiter-copilot-agent"
+      ],
+      "id": "agent-swarm-group",
+      "label": "Mastra Agent Swarm"
+    },
+    {
+      "children": [
+        "qdrant-cloud-db",
+        "neon-postgres-db",
+        "cloudflare-r2-storage"
+      ],
+      "id": "data-layer-group",
+      "label": "Data & Storage Layer"
+    },
+    {
+      "children": [
+        "enkrypt-ai-safety-gate",
+        "github-external-api",
+        "llm-provider-api"
+      ],
+      "id": "external-integrations-group",
+      "label": "External Integrations & Safety"
+    }
+  ],
+  "metadata": {}
+}
