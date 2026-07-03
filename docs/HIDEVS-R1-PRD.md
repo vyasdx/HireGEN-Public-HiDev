@@ -95,4 +95,124 @@ The five verbs the challenge demands — **Think · Retrieve · Remember · Eval
 - Enkrypt Skill Sentinel: https://github.com/enkryptai/skill-sentinel
 
 ---
+
+## 10. Requirement specification
+
+This section is written as the evaluator-facing PRD layer. It converts the product narrative above into explicit, testable requirements with IDs, acceptance criteria, and traceability to the proposed Mastra/Qdrant/Enkrypt architecture.
+
+### 10.1 Functional requirements
+
+| ID | Requirement | Priority | Acceptance criteria | Traceability |
+|---|---|---:|---|---|
+| FR-HG-001 | The system shall ingest a free-text job description and extract role title, seniority, required skills, preferred skills, domain signals, and proof bar. | P0 | Given a JD, the output contains at least 8 normalized role requirements and separates must-have from preferred skills. | JD Analyzer Agent · Qdrant `role_intel` |
+| FR-HG-002 | The system shall ingest candidate evidence from resume text, GitHub URLs, live project URLs, private-work notes, certifications, and interview responses. | P0 | Candidate evidence is accepted without requiring GitHub; missing GitHub must not create a penalty by itself. | Skill Graph Agent · Object Storage · Qdrant `evidence` |
+| FR-HG-003 | The system shall create a candidate skill graph with evidence labels for each skill claim. | P0 | Every skill includes score, category, evidence source, evidence level, and confidence note. | Skill Graph Agent |
+| FR-HG-004 | The system shall classify evidence as direct proof, logical transfer, candidate supplied, missing proof, or lab pending. | P0 | No recruiter-facing claim is shown without one of the five evidence labels. | Evidence model · Enkrypt grounding gate |
+| FR-HG-005 | The system shall semantically rank candidates against the JD using role context and candidate evidence. | P0 | Ranked output includes fit score, score breakdown, matched proof, transfer evidence, missing proof, and next action. | Candidate Ranker Agent · Qdrant `candidates` |
+| FR-HG-006 | The system shall generate role-specific interview questions based on the JD and candidate gaps. | P1 | At least 5 questions are generated per candidate and each question maps to a role requirement or identified gap. | Interview Generator Agent |
+| FR-HG-007 | The system shall generate validation-lab tasks for uncertain or high-risk skills. | P1 | For every high-priority gap, the system can recommend a lab task with expected evidence and grading rubric. | Validation Lab workflow |
+| FR-HG-008 | The system shall evaluate candidate responses against role-specific rubrics. | P1 | Evaluation output includes pass/risk flags, rubric score, evidence references, and human-review notes. | Response Evaluation Agent · Enkrypt |
+| FR-HG-009 | The system shall produce recruiter-ready recommendations: Shortlist, Needs Lab, or Reject for Now. | P0 | Every recommendation includes why, key evidence, risk, and recommended next action. | Recruiter Copilot Agent · HITL workflow |
+| FR-HG-010 | The system shall pause for human recruiter approval before any hiring decision is finalized. | P0 | No autonomous reject/shortlist action is executed without recruiter confirmation. | Mastra HITL suspend/resume |
+| FR-HG-011 | The system shall remember recruiter decisions and outcomes for future role calibration. | P1 | Recruiter action and candidate outcome are stored as memory vectors and can be retrieved by similar roles. | Qdrant `outcomes` |
+| FR-HG-012 | The system shall run safety, grounding, toxicity, and bias checks before displaying recommendations. | P0 | Unsafe, ungrounded, or biased outputs are blocked or marked for review before recruiter display. | Enkrypt safety gate |
+| FR-HG-013 | The system shall expose an audit trail for score, evidence, generated questions, evaluations, and recruiter decisions. | P1 | A reviewer can inspect why a candidate received a score and which evidence influenced it. | Audit log · Qdrant · relational DB |
+| FR-HG-014 | The system shall support candidate-facing proof readiness without charging candidates for core access. | P2 | Candidate can create/read a proof profile and roadmap without payment. | Candidate builder UI |
+
+### 10.2 Non-functional requirements
+
+| ID | Requirement | Target / threshold | Why it matters |
+|---|---|---|---|
+| NFR-HG-001 | Explainability | 100% of displayed skills and recommendations must include evidence labels. | Hiring decisions must be inspectable, not black-box. |
+| NFR-HG-002 | Safety gate coverage | 100% of recruiter-facing AI outputs pass through Enkrypt or equivalent policy gate. | Hiring is high-stakes and bias-sensitive. |
+| NFR-HG-003 | Latency | MVP target: first ranked shortlist under 60 seconds for 50 candidates; production target: async worker for larger batches. | Recruiter workflow should feel faster than resume screening. |
+| NFR-HG-004 | Availability | MVP design supports graceful degradation if GitHub or LLM provider is unavailable. | Private/enterprise candidates should not be penalized due to external API failure. |
+| NFR-HG-005 | Data minimization | Store only required candidate evidence, generated outputs, audit IDs, and recruiter decisions. | Reduces privacy risk and supports DPDP/GDPR posture. |
+| NFR-HG-006 | Reproducibility | Same input evidence + same model/version configuration should produce traceable comparable outputs. | Prevents silent drift in recruiter decisions. |
+| NFR-HG-007 | Observability | Every agent run should emit trace ID, prompt version, model, latency, token use, safety result, and output schema status. | Enables debugging and responsible AI audits. |
+| NFR-HG-008 | Accessibility | Recruiter dashboard and candidate profile should meet WCAG AA contrast and keyboard navigation for core flows. | Hiring tools must be usable by diverse users. |
+| NFR-HG-009 | Security | Secrets are server-only; uploaded resumes and evidence artifacts are private by default. | Candidate evidence can contain sensitive personal data. |
+
+## 11. Compliance and responsible AI requirements
+
+| ID | Requirement | Acceptance criteria |
+|---|---|---|
+| COMP-HG-001 | Consent capture | Candidate-facing upload flow must clearly state what data is processed and why before analysis begins. |
+| COMP-HG-002 | Data retention | MVP profile retention defaults to 14 days unless the user explicitly saves or shares the profile. |
+| COMP-HG-003 | Right to deletion | Production roadmap includes a deletion endpoint that removes profile records, artifact references, and vector memory by candidate/profile ID. |
+| COMP-HG-004 | Bias-sensitive fields | Ranking must not use protected attributes such as gender, religion, caste, age, marital status, or disability. |
+| COMP-HG-005 | Proxy monitoring | The system should monitor adverse impact across available non-sensitive proxy groups only for fairness auditing, not for ranking boosts. |
+| COMP-HG-006 | 4/5ths rule check | Recruiter dashboards should surface a warning when selection-rate disparity crosses the 80% adverse-impact threshold. |
+| COMP-HG-007 | Human accountability | The system is decision support only; final shortlist/reject decisions remain with the recruiter. |
+| COMP-HG-008 | Grounding | Unsupported claims must be labeled as candidate-supplied or missing proof, not converted into verified skills. |
+
+## 12. Agent prompt and output contracts
+
+Each Mastra agent must use a constrained prompt with a typed output schema. The goal is not free-form chat; the goal is predictable hiring workflow outputs.
+
+| Agent | Prompt objective | Required output schema |
+|---|---|---|
+| JD Analyzer Agent | Extract role requirements without adding imaginary skills. | `RoleRequirement[]`, seniority, must-have/preferred split, proof bar |
+| Skill Graph Agent | Convert candidate evidence into normalized skills with source references. | `SkillGraph`, `EvidenceItem[]`, evidence levels |
+| Candidate Ranker Agent | Compare role requirements against candidate proof. | `FitScore`, `score_breakdown`, matched/missing/transfer evidence |
+| Interview Generator Agent | Create questions targeted to role gaps and uncertainty. | `InterviewQuestion[]` with linked requirement IDs |
+| Response Evaluation Agent | Grade answers against rubric and expected evidence. | `EvaluationResult`, rubric scores, uncertainty notes |
+| Recruiter Copilot Agent | Summarize candidate recommendation for human decision. | `Recommendation`, next action, risk flags, audit references |
+
+Prompt style target: CRISPE-style instructions — Context, Role, Instruction, Steps, Parameters, Evaluation. Few-shot examples should include (a) strong direct proof, (b) logical transfer, (c) private enterprise work, (d) missing proof, and (e) biased or ungrounded output that must be blocked.
+
+## 13. Traceability matrix
+
+| Challenge requirement | HireGEN feature | PRD requirement IDs | Architecture component |
+|---|---|---|---|
+| Analyze job descriptions | JD understanding | FR-HG-001 | JD Analyzer Agent · Qdrant `role_intel` |
+| Semantically rank candidates | Evidence-based ranking | FR-HG-003, FR-HG-004, FR-HG-005 | Candidate Ranker Agent · Qdrant |
+| Generate role-specific interviews | Interview generation | FR-HG-006, FR-HG-007 | Interview Generator Agent · Validation Lab |
+| Evaluate responses | Response evaluation | FR-HG-008 | Response Evaluation Agent · Enkrypt |
+| Recruiter-ready recommendations | HITL recommendation | FR-HG-009, FR-HG-010 | Recruiter Copilot Agent · Mastra HITL |
+| Ensure fairness and safety | Safety gate and audit | FR-HG-012, COMP-HG-004, COMP-HG-006 | Enkrypt safety gate |
+| Persistent memory/RAG | Outcome memory | FR-HG-011 | Qdrant `outcomes` |
+| Full-stack feasibility | Frontend/backend/data deployment | NFR-HG-003, NFR-HG-007, NFR-HG-009 | Next.js · Mastra · Qdrant · DB · storage |
+
+## 14. MVP acceptance tests
+
+1. **JD extraction test:** Given a Senior AI Systems Engineer JD, the system extracts AI/ML, Python, RAG, agentic workflows, cloud-native deployment, observability, and evaluation requirements.
+2. **No GitHub bias test:** Given a strong enterprise/private-work profile without GitHub, the system must still produce a credible skill graph and mark GitHub as optional/missing, not as a disqualifier.
+3. **Evidence label test:** Every recruiter-visible skill must show direct proof, logical transfer, candidate supplied, missing proof, or lab pending.
+4. **Target-fit explanation test:** A low target-role score must explain which required skills are missing and how lab validation can close uncertainty.
+5. **Interview generation test:** Generated questions must map to role requirements and candidate gaps.
+6. **Safety gate test:** If the output uses unsupported demographic or pedigree assumptions, Enkrypt blocks the response.
+7. **Human-in-loop test:** Recruiter recommendation cannot finalize until a recruiter selects Shortlist, Needs Lab, or Reject for Now.
+8. **Outcome memory test:** A recruiter decision is stored and retrieved as context for a similar future role.
+
+## 15. Observability and audit design
+
+For Round-2 build, every workflow run should create a `trace_id` and record:
+
+- agent name and version,
+- prompt template version,
+- input artifact IDs,
+- model/provider,
+- schema validation result,
+- Enkrypt policy result,
+- Qdrant collection/query IDs,
+- latency and token usage,
+- final recommendation,
+- recruiter HITL decision,
+- any override reason.
+
+Recommended tools for implementation: OpenTelemetry-compatible traces, Langfuse or Arize Phoenix for LLM observability, and a lightweight audit table for recruiter decisions.
+
+## 16. Build milestones if selected
+
+| Date window | Milestone | Output |
+|---|---|---|
+| Jul 4–5 | Mastra workflow skeleton | TypeScript agents wired with typed schemas and mock data |
+| Jul 6–7 | Qdrant memory + retrieval | Role intelligence, candidate evidence, and outcome collections |
+| Jul 8 | Enkrypt gate | Safety, grounding, and bias checks before recruiter display |
+| Jul 9 | Interview + response evaluation | Role-specific interview and validation-lab preview |
+| Jul 10–11 | Recruiter dashboard polish | HITL actions, audit view, score explanation |
+| Jul 12 | Finale demo | End-to-end JD → candidate ranking → interview → evaluation → recruiter recommendation |
+
+---
 *HireGEN · "Get hired on proof, not pedigree."*
